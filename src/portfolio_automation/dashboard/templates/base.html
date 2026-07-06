@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Portfolio Automation Dashboard{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body class="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+  <nav class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <div class="flex items-center space-x-4">
+          <span class="text-xl font-bold bg-gradient-to-r from-blue-400 to-indigo-500 bg-clip-text text-transparent">
+            🚀 Portfolio Engine
+          </span>
+          <div class="flex items-center space-x-2 text-xs text-slate-400 bg-slate-800/60 px-2.5 py-1 rounded-full border border-slate-700">
+            <span id="ws-status-indicator" class="w-2.5 h-2.5 rounded-full bg-yellow-500"></span>
+            <span>Live Feed</span>
+          </div>
+        </div>
+        <div class="flex space-x-6 text-sm font-medium">
+          <a href="/" class="hover:text-blue-400 transition {% if request.url.path == '/' %}text-blue-400 font-semibold{% else %}text-slate-300{% endif %}">Dashboard</a>
+          <a href="/settings" class="hover:text-blue-400 transition {% if request.url.path == '/settings' %}text-blue-400 font-semibold{% else %}text-slate-300{% endif %}">Settings</a>
+          <a href="/history" class="hover:text-blue-400 transition {% if request.url.path == '/history' %}text-blue-400 font-semibold{% else %}text-slate-300{% endif %}">History</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    {% block content %}{% endblock %}
+  </main>
+
+  <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col space-y-2"></div>
+  <script src="/static/dashboard.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

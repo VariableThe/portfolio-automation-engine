@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Environment
+.env
+.env.local
+*.env
+
+# Database
+*.db
+*.sqlite3
+data/
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Ruff / Black
+.ruff_cache/
+
+# Coverage
+.coverage
+htmlcov/
+coverage/
+
+# Docker
+.docker/

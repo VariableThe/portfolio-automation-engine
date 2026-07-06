@@ -1,0 +1,41 @@
+broker:
+  type: mock
+
+execution:
+  poll_interval_seconds: 60
+  market_open: "09:15"
+  market_close: "15:30"
+  buy_queue_on_failure: skip
+
+safety:
+  dry_run: true
+  max_daily_trades: 10
+  max_daily_investment: 100000.0
+  max_allocation_per_stock: 0.20
+  cooldown_minutes: 30
+  manual_confirmation: false
+  kill_switch_enabled: true
+
+database:
+  path: "data/portfolio.db"
+
+logging:
+  level: INFO
+  format: console
+  file_path: null
+
+notifications:
+  enabled: true
+  channels:
+    console:
+      enabled: true
+      level: INFO
+    desktop:
+      enabled: false
+    discord:
+      enabled: false
+      webhook_url: "${DISCORD_WEBHOOK_URL}"
+    telegram:
+      enabled: false
+      bot_token: "${TELEGRAM_BOT_TOKEN}"
+      chat_id: "${TELEGRAM_CHAT_ID}"

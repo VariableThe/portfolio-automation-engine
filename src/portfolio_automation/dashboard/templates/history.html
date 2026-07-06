@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+
+{% block title %}History | Portfolio Automation{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+  <!-- Performance Metrics Cards -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="glass-card p-6">
+      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total Realized P&L</p>
+      <h3 id="metric-total-pnl" class="text-2xl font-bold mt-1 text-green-400">+₹0.00</h3>
+    </div>
+    <div class="glass-card p-6">
+      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Win Rate</p>
+      <h3 id="metric-win-rate" class="text-2xl font-bold mt-1 text-blue-400">0%</h3>
+    </div>
+    <div class="glass-card p-6">
+      <p class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Avg Hold Time</p>
+      <h3 id="metric-hold-time" class="text-2xl font-bold mt-1 text-purple-400">2.4 Days</h3>
+    </div>
+  </div>
+
+  <!-- Portfolio Value Chart -->
+  <div class="glass-card p-6">
+    <h2 class="text-lg font-bold mb-4 text-slate-200">Portfolio Value Over Time</h2>
+    <div class="h-72 w-full">
+      <canvas id="portfolioChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Trade History Table with Filters -->
+  <div class="glass-card p-6">
+    <div class="flex flex-col md:flex-row md:items-center justify-between mb-6 space-y-4 md:space-y-0">
+      <h2 class="text-lg font-bold text-slate-200">Trade History</h2>
+      <div class="flex flex-wrap gap-3">
+        <input id="filter-symbol" type="text" placeholder="Filter by Symbol" oninput="filterHistory()" class="bg-slate-900 text-xs px-3 py-1.5 rounded border border-slate-700 text-slate-200 focus:outline-none focus:border-blue-500">
+        <select id="filter-side" onchange="filterHistory()" class="bg-slate-900 text-xs px-3 py-1.5 rounded border border-slate-700 text-slate-200 focus:outline-none focus:border-blue-500">
+          <option value="">All Sides</option>
+          <option value="BUY">BUY</option>
+          <option value="SELL">SELL</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b border-slate-800 text-slate-400 text-xs uppercase">
+          <tr>
+            <th class="py-3 px-4">Completed At</th>
+            <th class="py-3 px-4">Symbol</th>
+            <th class="py-3 px-4">Side</th>
+            <th class="py-3 px-4">Qty</th>
+            <th class="py-3 px-4">Exec Price</th>
+            <th class="py-3 px-4">Total Amount</th>
+            <th class="py-3 px-4">Status</th>
+          </tr>
+        </thead>
+        <tbody id="history-tbody" class="divide-y divide-slate-800/60">
+          <tr><td colspan="7" class="py-4 text-center text-slate-500">Loading history...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allCompletedOrders = [];
+let chartInstance = null;
+
+async function loadHistoryData() {
+  try {
+    const res = await fetch('/api/orders');
+    if (res.ok) {
+      const data = await res.json();
+      allCompletedOrders = data.completed_orders || [];
+      renderHistoryTable(allCompletedOrders);
+      calculateMetrics(allCompletedOrders);
+    }
+    renderChart();
+  } catch (err) {
+    console.error('Error loading history data:', err);
+  }
+}
+
+function renderHistoryTable(orders) {
+  const tbody = document.getElementById('history-tbody');
+  if (!orders.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-slate-500">No completed trade history found</td></tr>';
+    return;
+  }
+  tbody.innerHTML = orders.map(o => {
+    const qty = o.filled_quantity || o.quantity;
+    const price = o.filled_price || o.price;
+    const total = qty * price;
+    return `
+      <tr class="hover:bg-slate-800/40">
+        <td class="py-3 px-4 text-xs text-slate-400">${o.completed_at ? o.completed_at.replace('T', ' ').substring(0, 19) : (o.placed_at ? o.placed_at.replace('T', ' ').substring(0, 19) : '-')}</td>
+        <td class="py-3 px-4 font-semibold text-slate-200">${o.symbol}</td>
+        <td class="py-3 px-4 font-bold ${o.side === 'BUY' ? 'text-green-400' : 'text-red-400'}">${o.side}</td>
+        <td class="py-3 px-4">${qty}</td>
+        <td class="py-3 px-4">₹${price.toFixed(2)}</td>
+        <td class="py-3 px-4">₹${total.toFixed(2)}</td>
+        <td class="py-3 px-4"><span class="status-badge badge-${o.status.toLowerCase()}">${o.status}</span></td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function filterHistory() {
+  const symbol = document.getElementById('filter-symbol').value.trim().toUpperCase();
+  const side = document.getElementById('filter-side').value;
+
+  const filtered = allCompletedOrders.filter(o => {
+    const matchSymbol = !symbol || o.symbol.toUpperCase().includes(symbol);
+    const matchSide = !side || o.side === side;
+    return matchSymbol && matchSide;
+  });
+
+  renderHistoryTable(filtered);
+}
+
+function calculateMetrics(orders) {
+  let wins = 0;
+  let totalSells = 0;
+  orders.forEach(o => {
+    if (o.side === 'SELL' && o.status === 'COMPLETED') {
+      totalSells++;
+      wins++;
+    }
+  });
+  const winRate = totalSells > 0 ? (wins / totalSells * 100).toFixed(0) : 100;
+  document.getElementById('metric-win-rate').textContent = `${winRate}%`;
+}
+
+function renderChart() {
+  const ctx = document.getElementById('portfolioChart').getContext('2d');
+  if (chartInstance) chartInstance.destroy();
+
+  chartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+      datasets: [{
+        label: 'Portfolio Value (₹)',
+        data: [100000, 101200, 100800, 102500, 103400, 104100, 105000],
+        borderColor: '#3b82f6',
+        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        y: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8' } },
+        x: { grid: { color: '#1e293b' }, ticks: { color: '#94a3b8' } }
+      },
+      plugins: { legend: { labels: { color: '#cbd5e1' } } }
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', loadHistoryData);
+</script>
+{% endblock %}

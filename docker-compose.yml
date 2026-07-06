@@ -1,0 +1,30 @@
+services:
+  engine:
+    build: .
+    command: uv run portfolio-automation
+    volumes:
+      - portfolio_data:/app/data
+      - ./config:/app/config:ro
+    env_file: .env
+    restart: unless-stopped
+    networks:
+      - portfolio_net
+
+  dashboard:
+    build: .
+    command: uv run uvicorn portfolio_automation.dashboard.app:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - portfolio_data:/app/data
+      - ./config:/app/config:ro
+    env_file: .env
+    restart: unless-stopped
+    networks:
+      - portfolio_net
+
+volumes:
+  portfolio_data:
+
+networks:
+  portfolio_net:

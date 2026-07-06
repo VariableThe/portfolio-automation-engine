@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}Settings | Portfolio Automation{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+  <div class="flex items-center justify-between">
+    <h1 class="text-2xl font-bold text-slate-100">System Configuration & Controls</h1>
+    <div class="flex items-center space-x-2 bg-slate-900 px-4 py-2 rounded-lg border border-slate-700">
+      <label for="api-key-input" class="text-xs font-semibold text-slate-400">API Key:</label>
+      <input id="api-key-input" type="password" placeholder="Enter API Key for sensitive ops" class="bg-slate-800 text-sm px-2 py-1 rounded border border-slate-600 focus:outline-none focus:border-blue-500">
+    </div>
+  </div>
+
+  <!-- System Controls & Safety Switches -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div class="glass-card p-6 flex flex-col justify-between">
+      <div>
+        <h3 class="font-bold text-slate-200">Automation Engine</h3>
+        <p class="text-xs text-slate-400 mt-1">Enable or pause automatic rule evaluation and trading cycles.</p>
+      </div>
+      <div class="mt-4 flex items-center justify-between">
+        <span id="automation-status" class="text-sm font-semibold text-green-400">Enabled</span>
+        <button onclick="toggleAutomation()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-1.5 rounded-md text-sm font-medium transition">Toggle</button>
+      </div>
+    </div>
+
+    <div class="glass-card p-6 flex flex-col justify-between">
+      <div>
+        <h3 class="font-bold text-slate-200">Dry-Run Mode</h3>
+        <p class="text-xs text-slate-400 mt-1">Simulate order placements without executing live broker transactions.</p>
+      </div>
+      <div class="mt-4 flex items-center justify-between">
+        <span id="dry-run-status" class="text-sm font-semibold text-yellow-400">Disabled</span>
+        <button onclick="toggleDryRun()" class="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-1.5 rounded-md text-sm font-medium transition">Toggle</button>
+      </div>
+    </div>
+
+    <div class="glass-card p-6 flex flex-col justify-between border border-red-500/40 bg-red-950/20">
+      <div>
+        <h3 class="font-bold text-red-400">Kill Switch</h3>
+        <p class="text-xs text-red-300/80 mt-1">Immediately halt all trading activities and block new orders.</p>
+      </div>
+      <div class="mt-4 flex items-center justify-between">
+        <span id="kill-switch-status" class="text-sm font-semibold text-slate-400">Inactive</span>
+        <button onclick="triggerKillSwitch()" class="bg-red-600 hover:bg-red-500 text-white px-4 py-1.5 rounded-md text-sm font-bold transition">TRIGGER KILL SWITCH</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Manual Confirmation Queue -->
+  <div class="glass-card p-6">
+    <h2 class="text-lg font-bold mb-4 text-slate-200">Manual Confirmation Queue</h2>
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b border-slate-800 text-slate-400 text-xs uppercase">
+          <tr>
+            <th class="py-2 px-3">Symbol</th>
+            <th class="py-2 px-3">Flagged Status</th>
+            <th class="py-2 px-3 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="manual-queue-tbody" class="divide-y divide-slate-800/60">
+          <tr><td colspan="3" class="py-4 text-center text-slate-500">No trades pending manual confirmation</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Broker Config View -->
+  <div class="glass-card p-6">
+    <h2 class="text-lg font-bold mb-4 text-slate-200">Broker Configuration</h2>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+      <div class="bg-slate-900/60 p-3 rounded border border-slate-800">
+        <span class="text-xs text-slate-400 block">Broker Provider</span>
+        <span class="font-semibold text-slate-200">Zerodha Kite / Mock Broker</span>
+      </div>
+      <div class="bg-slate-900/60 p-3 rounded border border-slate-800">
+        <span class="text-xs text-slate-400 block">API Credentials</span>
+        <span class="font-semibold text-slate-400">•••••••••••••••• (Masked for security)</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- YAML Rules Editor -->
+  <div class="glass-card p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="text-lg font-bold text-slate-200">Rules Editor (YAML)</h2>
+      <button onclick="saveRules()" class="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 rounded-md text-sm font-medium transition">Save Rules</button>
+    </div>
+    <textarea id="rules-yaml-editor" rows="14" class="w-full bg-slate-900 border border-slate-700 rounded-lg p-4 font-mono text-xs text-slate-200 focus:outline-none focus:border-blue-500"></textarea>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let currentAutomation = true;
+let currentDryRun = false;
+
+async function loadSettingsData() {
+  try {
+    const res = await fetch('/api/buy-queue');
+    if (res.ok) {
+      const data = await res.json();
+      document.getElementById('rules-yaml-editor').value = data.raw_yaml || '';
+    }
+  } catch (err) {
+    console.error('Error loading rules YAML:', err);
+  }
+}
+
+function getApiKey() {
+  return document.getElementById('api-key-input').value;
+}
+
+async function toggleAutomation() {
+  currentAutomation = !currentAutomation;
+  const res = await fetch('/api/settings/automation', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({enabled: currentAutomation})
+  });
+  if (res.ok) {
+    document.getElementById('automation-status').textContent = currentAutomation ? 'Enabled' : 'Disabled';
+    document.getElementById('automation-status').className = currentAutomation ? 'text-sm font-semibold text-green-400' : 'text-sm font-semibold text-red-400';
+  }
+}
+
+async function toggleDryRun() {
+  currentDryRun = !currentDryRun;
+  const res = await fetch('/api/settings/dry-run', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({enabled: currentDryRun})
+  });
+  if (res.ok) {
+    document.getElementById('dry-run-status').textContent = currentDryRun ? 'Enabled' : 'Disabled';
+    document.getElementById('dry-run-status').className = currentDryRun ? 'text-sm font-semibold text-green-400' : 'text-sm font-semibold text-yellow-400';
+  }
+}
+
+async function triggerKillSwitch() {
+  if (!confirm('Are you sure you want to trigger the Kill Switch? This halts all trading!')) return;
+  const apiKey = getApiKey();
+  const res = await fetch('/api/kill-switch', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-API-Key': apiKey
+    },
+    body: JSON.stringify({active: true})
+  });
+  if (res.ok) {
+    document.getElementById('kill-switch-status').textContent = 'ACTIVE';
+    document.getElementById('kill-switch-status').className = 'text-sm font-bold text-red-500';
+    alert('Kill switch activated successfully.');
+  } else {
+    const err = await res.json();
+    alert(`Failed to trigger kill switch: ${err.detail || 'Unauthorized'}`);
+  }
+}
+
+async function saveRules() {
+  const content = document.getElementById('rules-yaml-editor').value;
+  const res = await fetch('/api/settings/rules', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({yaml_content: content})
+  });
+  if (res.ok) {
+    alert('Rules saved successfully!');
+  } else {
+    const err = await res.json();
+    alert(`Error saving rules: ${err.detail}`);
+  }
+}
+
+document.addEventListener('DOMContentLoaded', loadSettingsData);
+</script>
+{% endblock %}

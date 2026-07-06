@@ -1,0 +1,10 @@
+
+buy_queue:
+  - symbol: HDFC
+    priority: 1
+    condition:
+      type: rsi
+      params:
+        period: 14
+        lower: 30
+sell_rules: []
