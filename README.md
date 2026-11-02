@@ -92,10 +92,17 @@ uv sync --extra dev
 
 ### 2. Configuration
 
-There is no tracked `.env.example` file. The committed
-[`config/default.yaml`](config/default.yaml) selects the Mock broker and
-enables `dry_run`. Keep it that way while inspecting or testing the current
-code; this project is not ready for live broker credentials.
+The tracked [`.env.example`](.env.example) provides placeholder environment
+values. Before using Docker Compose, create its required local `.env` file:
+
+```bash
+cp .env.example .env
+```
+
+Keep the Mock broker and `dry_run: true` defaults in
+[`config/default.yaml`](config/default.yaml). Do not add real brokerage or
+notification credentials while inspecting this scaffold, and never commit
+`.env`. This project is not ready for live broker credentials.
 
 ### 3. Running Locally
 The documented CLI currently performs initialization and sleeps; it does not
@@ -114,8 +121,12 @@ Open your browser to [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
 ### 4. Running with Docker Compose
 
-Docker Compose starts the same CLI scaffold and independent dashboard. It is
-not a production deployment path:
+Docker Compose starts the same CLI scaffold and independent dashboard and
+requires the local `.env` file described above. It is not a production
+deployment path. The checked-in port mapping publishes port `8000` on all
+host interfaces, and not every dashboard route requires authentication.
+Do not expose this scaffold to an untrusted network; prefer the loopback-only
+direct command above for local inspection:
 ```bash
 docker-compose up -d --build
 ```
@@ -223,7 +234,7 @@ state, these routes do not control a running automation loop.
 
 ### Adding a New Broker
 1. Implement the `Broker` protocol defined in `src/portfolio_automation/broker/interface.py`.
-2. Ensure your class implements `get_holdings()`, `get_cash_balance()`, `place_order()`, and `get_order_status()`.
+2. Follow the complete [protocol](src/portfolio_automation/broker/interface.py), including `get_balance()`, `place_buy_order()`, and `place_sell_order()`; there is no `get_cash_balance()` or generic `place_order()` method.
 3. Wire the implementation into an application entry point before relying on it; the repository does not currently include a broker factory or CLI integration.
 
 ### Adding a New Rule Condition
@@ -260,7 +271,7 @@ following as an initial review list rather than a deployment runbook:
 
 ### 1. Security & Access Control
 - [ ] **Non-Root Execution**: Verify the Docker container is running under the secure non-root user (`appuser`, UID 1000).
-- [ ] **API Authentication**: Set a strong, cryptographically random `DASHBOARD_API_KEY` in `.env` to protect dashboard mutations and settings.
+- [ ] **API Authentication**: Add and verify authentication for all sensitive routes. The current `DASHBOARD_API_KEY` check covers the kill-switch and manual-confirmation routes, not every mutation or settings route.
 - [ ] **Reverse Proxy & SSL**: Terminate SSL/TLS using Nginx, Caddy, or Traefik before routing traffic to port `8000`.
 - [ ] **Firewall**: Restrict public access to port `8000`; only expose ports `80`/`443` via your reverse proxy.
 
