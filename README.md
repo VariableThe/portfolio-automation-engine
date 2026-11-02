@@ -1,10 +1,25 @@
-# Portfolio Automation Engine 📈⚙️
+# Portfolio Automation Engine
 
-An advanced, highly decoupled, asynchronous algorithmic portfolio management and execution system designed for Indian stock brokers (such as Zerodha Kite Connect). Featuring declarative YAML strategy rules, robust multi-layer safety gates, multi-channel alerting, and a real-time glassmorphic web dashboard.
+> **Status: development scaffold — not for real-money trading or production deployment.**
+
+This repository contains experimental components for configuration, rules,
+broker adapters, safety checks, persistence, notifications, and a dashboard.
+The current `portfolio-automation` CLI loads configuration, initializes
+logging, and waits between polling intervals. It does not construct or run
+`ExecutionEngine`, load strategy rules, start the dashboard, authenticate a
+broker, or submit and monitor orders. Docker Compose starts that same CLI and
+the dashboard as separate processes.
+
+Treat the code as a foundation for further integration and testing, not an
+automated trading system. Do not use it with live brokerage credentials or
+financial decisions.
 
 ---
 
-## Architecture Overview
+## Component map
+
+The following diagram shows the intended relationships among the implemented
+components; it is not the current CLI runtime wiring.
 
 ```mermaid
 graph TD
@@ -43,60 +58,64 @@ graph TD
 
 ---
 
-## Key Features
+## Included components
 
 - **Declarative YAML Strategies**: Define buy queues with priority ranking and sell rules using human-readable conditions (e.g., RSI, Moving Average Crossovers, Allocation Limits, Price Targets).
-- **Pluggable Broker Interface**: Switch effortlessly between live trading via **Zerodha Kite Connect** and simulated paper trading via the fully integrated **Mock Broker**.
+- **Broker Interfaces**: Interfaces and implementations for a Mock broker and Zerodha Kite Connect are present, but the CLI does not instantiate either one.
 - **Multi-Layered Safety Gates**:
   - **Dry-Run Guard**: Simulate all order executions safely without real financial exposure.
   - **Kill Switch**: Immediate emergency halt that blocks any further order placement.
   - **Risk Governors**: Configurable daily trade counts, maximum daily investment volume, per-stock allocation percentages, and post-trade cooldown timers.
   - **Manual Confirmation**: Flag sensitive or high-value orders for explicit manual review before placement.
 - **Asynchronous Multi-Channel Notifications**: Decoupled, non-blocking alert dispatch across Console, Desktop system notifications, Discord Webhooks, and Telegram Bots with rate-limiting throttling.
-- **Real-Time Web Dashboard**: Built with FastAPI, Jinja2, and Tailwind CSS featuring a glassmorphic dark UI, live WebSocket updates, interactive Chart.js analytics, and full strategy/rule management.
-- **Production-Ready Containerization**: Optimized multi-stage Docker build (`< 500MB`) running as a secure non-root user with automated health checks.
+- **Dashboard Components**: A FastAPI dashboard, templates, WebSocket support, and settings routes can run independently of the CLI.
+- **Container Scaffolding**: Docker and Docker Compose files are included for local development experiments; they do not make the application production-ready.
 
 ---
 
-## Quick Start
+## Inspect or develop locally
 
 ### Prerequisites
 - **Python 3.13+**
 - **[uv](https://docs.astral.sh/uv/)** package manager
-- **Docker & Docker Compose** (for container deployment)
+- **Docker & Docker Compose** (optional, for the included local containers)
 
 ### 1. Installation
 Clone the repository and install dependencies using `uv`:
 ```bash
-git clone https://github.com/yourusername/portfolio-automation-engine.git
+git clone https://github.com/VariableThe/portfolio-automation-engine.git
 cd portfolio-automation-engine
 
 # Install project and dev dependencies
-uv sync
+uv sync --extra dev
 ```
 
-### 2. Environment Setup
-Copy the example environment file and configure your API keys and credentials:
-```bash
-cp .env.example .env
-```
+### 2. Configuration
+
+There is no tracked `.env.example` file. The committed
+[`config/default.yaml`](config/default.yaml) selects the Mock broker and
+enables `dry_run`. Keep it that way while inspecting or testing the current
+code; this project is not ready for live broker credentials.
 
 ### 3. Running Locally
-Start the execution engine and real-time dashboard concurrently in two terminal sessions:
+The documented CLI currently performs initialization and sleeps; it does not
+execute an automation cycle or place orders:
 
-**Terminal 1 (Execution Engine):**
+**Terminal 1 (current CLI scaffold):**
 ```bash
 uv run portfolio-automation
 ```
 
-**Terminal 2 (FastAPI Dashboard):**
+**Terminal 2 (independent FastAPI dashboard):**
 ```bash
 uv run uvicorn portfolio_automation.dashboard.app:app --host 127.0.0.1 --port 8000 --reload
 ```
 Open your browser to [http://127.0.0.1:8000](http://127.0.0.1:8000).
 
-### 4. Running with Docker Compose (Recommended for Production)
-Launch both the engine and dashboard in isolated, auto-restarting Docker containers:
+### 4. Running with Docker Compose
+
+Docker Compose starts the same CLI scaffold and independent dashboard. It is
+not a production deployment path:
 ```bash
 docker-compose up -d --build
 ```
@@ -109,6 +128,10 @@ docker-compose ps
 ---
 
 ## Configuration Guide
+
+The files below define inputs for the component layer. The current CLI does
+not wire them into an execution engine, so changing them does not cause the
+documented strategy behavior to run.
 
 ### System Configuration (`config/default.yaml`)
 ```yaml
@@ -188,19 +211,20 @@ sell_rules:
         percentage: 3.0
 ```
 
-### Dashboard Operations
-- **System Kill Switch**: Navigate to the **Settings** tab (`/settings`). Toggle the red **Emergency Kill Switch** button. When activated, all incoming buy and sell signals are immediately blocked across the execution loop.
-- **Manual Trade Approval**: If `manual_confirmation: true` is configured, pending orders appear in the **Manual Confirmations** queue on the Settings page. Review symbol details and click **Approve** or **Reject**.
-- **Live Strategy Updates**: Modify or paste YAML directly into the **Strategy Rules Editor** on the Settings page and click **Save Rules**. The new strategy takes effect immediately without engine restart.
+### Dashboard routes
+
+The dashboard exposes settings, safety, and rules routes for its own process.
+Because the CLI does not construct an `ExecutionEngine` or share the dashboard
+state, these routes do not control a running automation loop.
 
 ---
 
 ## Development Guide
 
 ### Adding a New Broker
-1. Implement the `Broker` protocol defined in `src/portfolio_automation/brokers/interface.py`.
+1. Implement the `Broker` protocol defined in `src/portfolio_automation/broker/interface.py`.
 2. Ensure your class implements `get_holdings()`, `get_cash_balance()`, `place_order()`, and `get_order_status()`.
-3. Register your implementation in `src/portfolio_automation/brokers/factory.py`.
+3. Wire the implementation into an application entry point before relying on it; the repository does not currently include a broker factory or CLI integration.
 
 ### Adding a New Rule Condition
 1. Create a custom evaluator function taking `(params: dict[str, Any], context: RuleContext) -> DecisionResult`.
@@ -208,7 +232,9 @@ sell_rules:
 3. Import your condition file inside `src/portfolio_automation/rules/conditions/__init__.py` to register it on startup.
 
 ### Running Tests and Linting
-The project includes a comprehensive unit and integration testing suite achieving **>91% code coverage** across all core modules.
+
+The repository includes unit and integration-named test modules for its
+components. No coverage result is asserted here.
 
 ```bash
 # Run the complete test suite with coverage report
@@ -221,20 +247,16 @@ uv run pytest tests/integration/ -v
 uv run ruff check src/ tests/
 ```
 
-#### Testing Suite Architecture:
-- **Unit Tests (`tests/`)**: High-speed unit tests covering broker implementations (`ZerodhaBroker`, `MockBroker`), execution loops, dry-run guards, rule evaluation, database repositories, and multi-channel notifications.
-- **Integration Tests (`tests/integration/`)**:
-  - **`test_trading_day.py`**: Full trading day simulation verifying multi-cycle execution, cash balance reconciliation, and daily summary notifications.
-  - **`test_failure_scenarios.py`**: Verifies resilience against network timeouts, partial fills across multiple polling cycles, broker order rejections, and kill switch activation during execution.
-  - **`test_safety_integration.py`**: Verifies defense-in-depth safety governors (daily limits, cooldown timers, allocation limits, manual confirmation queue).
-  - **`test_dashboard_integration.py`**: Verifies real-time FastAPI endpoints, WebSocket broadcasting, and live strategy/settings mutations.
-  - **`test_multi_broker.py` & `test_performance.py`**: Verifies seamless broker switching and execution loop performance benchmarks (`< 0.15s` per cycle).
-
 ---
 
-## Production Deployment Checklist 🚀
+## Deployment considerations
 
-When deploying the Portfolio Automation Engine to a VPS or cloud server (AWS, DigitalOcean, Hetzner, etc.), follow this checklist to ensure security, reliability, and observability:
+This is not a production deployment checklist: the runtime integration
+described above is still absent. The notes below are design considerations for
+a future deployment, not evidence that the current project is ready for one.
+
+If a future integrated version is deployed to a VPS or cloud server, use the
+following as an initial review list rather than a deployment runbook:
 
 ### 1. Security & Access Control
 - [ ] **Non-Root Execution**: Verify the Docker container is running under the secure non-root user (`appuser`, UID 1000).
@@ -266,6 +288,10 @@ When deploying the Portfolio Automation Engine to a VPS or cloud server (AWS, Di
 ---
 
 ## Roadmap
-- [x] Phase 1–8: Core Engine, Pluggable Brokers, Declarative Rules, Persistence, Safety Gates, Multi-Channel Notifications, Real-Time Dashboard.
-- [x] Phase 9: Production Docker Containerization & System Documentation.
-- [x] Phase 10: End-to-End System Integration Tests & Performance Benchmarks (Completed with >91% coverage).
+
+- [x] Component implementations for rules, broker adapters, persistence,
+  safety, notifications, and a dashboard.
+- [ ] Integrate the CLI with the execution engine, broker construction, rules,
+  persistence, and dashboard state.
+- [ ] Establish a reviewed test, security, and operational baseline before any
+  production or live-trading use.
